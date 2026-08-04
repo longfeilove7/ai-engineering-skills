@@ -126,7 +126,104 @@ description: Prompt Engineering引导Skill — 每次对话时检查用户prompt
 
 **使用建议：** 简单任务用七要素，复杂任务用TCREI，格式严格用TFCDC。
 
-## 第四章：DSPy 可编程Prompt优化⭐ 第三轮研究新增
+## 第四章：Few-Shot示例选择策略⭐ 第五轮研究新增
+
+> 来源：arXiv论文（Liu 2021, Rubin 2022, Min 2022, Lu 2022）、DSPy文档、实践指南
+> 完整研究报告：references/few-shot-selection-research.md
+
+### 4.1 如何选择最有效的示例
+
+**语义相似度选择**（最核心策略）：
+- 示例与输入的语义相似度是影响性能的最重要因素（Liu et al. arXiv:2101.06804）
+- 微调task-specific encoder比通用encoder效果更好
+- 在ToTTo任务提升41.9%，NQ开放域QA提升45.5%
+
+**EPR（Example-based Prompt Retrieval）**（arXiv:2112.08633）：
+- 训练dense retriever学习"哪些示例能带来最高输出概率"
+- 比单纯语义相似度更优
+
+**标签空间比标签正确性更重要**（Min et al. 2022）：
+- 标签空间分布和输入文本分布比单个示例标签是否正确更重要
+- 甚至随机标签的few-shot都比无标签的zero-shot好
+- 格式一致性 > 标签正确性
+
+**顺序敏感性**（Lu et al. arXiv:2104.08786）：
+- 示例顺序可导致准确率从SOTA降到随机水平
+- **最相似的示例放在最后**（靠近查询位置），效果通常更好
+
+### 4.2 示例数量最佳实践
+
+| 任务类型 | 推荐数量 | 说明 |
+|---------|---------|------|
+| 简单分类 | 2-3个 | 边际递减明显 |
+| 复杂分类 | 4-8个 | 覆盖各类别 |
+| 生成任务 | 2-5个 | 控制token预算 |
+| 推理任务 | 3-6个+CoT | 配合思维链 |
+| DSPy Bootstrap | 3-5个 | 超过5会过拟合 |
+
+**核心原则**：质量 > 数量，3个高质量 > 10个中等；边际递减：0→1巨大，1→3明显，3→5微小
+
+### 4.3 多样性的重要性
+
+**为什么需要多样性**：覆盖边界情况、减少偏差、提升泛化
+
+**多样性维度**：
+| 维度 | 说明 |
+|------|------|
+| 类别覆盖 | 所有输出标签都要有示例 |
+| 难度梯度 | 简单+中等+困难 |
+| 输入风格 | 长/短文本、正式/口语 |
+| 边界case | 模糊/争议性输入 |
+
+**相似性与多样性的平衡**（MMR策略）：
+```
+score = 0.7 × similarity(input, example) + 0.3 × diversity(example, selected)
+```
+即70%权重给相似度，30%给多样性。
+
+### 4.4 动态示例选择（根据输入选不同示例）
+
+| 方式 | 原理 | 适用场景 |
+|------|------|---------|
+| **检索式** | embedding + cosine similarity | 最实用，有embedding API时 |
+| **聚类式** | KMeans预聚类 + 按类别选 | 大规模示例库，计算快 |
+| **LLM自适应** | LLM判断输入类型再选 | 最灵活但最贵 |
+| **DSPy自动** | BootstrapFewShot | 有标注数据10+ |
+
+**DSPy BootstrapFewShot**（最成熟方案）：
+```python
+from dspy.teleprompt import BootstrapFewShot
+optimizer = BootstrapFewShot(metric=my_metric, max_bootstrapped_demos=3)
+compiled = optimizer.compile(module, trainset=trainset)
+```
+原理：在训练集运行 → 收集成功预测 → 评估效果 → 选择最佳demo组合
+
+### 4.5 快速决策指南
+
+**手动选择（无工具）**：
+1. 准备10-20个候选（覆盖各类别、各难度）
+2. 选3-5个（1简单+2典型+1边界）
+3. 格式一致，最相似的放最后
+4. 测试不同排列
+
+**自动选择（有工具）**：
+| 场景 | 方案 |
+|------|------|
+| 有标注数据10+ | DSPy BootstrapFewShot |
+| 有标注数据50+ | DSPy MIPROv2/GEPA |
+| 有embedding API | 语义检索+MMR |
+| 无标注数据 | 手动+格式一致优先 |
+
+### 4.6 Pitfalls
+
+1. **不要全选相似示例**：过拟合特定模式，加1-2个多样化示例
+2. **不要忽略顺序**：最相似的放最后（靠近查询）
+3. **不要标签分布偏斜**：正/负/中性比例要合理
+4. **不要示例太长**：每个示例控制在50-200 tokens
+5. **不要用错误示例**：一个错误示例可能污染所有输出
+6. **不要固定示例集**：不同输入类型需要不同示例
+
+## 第五章：DSPy 可编程Prompt优化⭐ 第三轮研究新增
 
 > 来源：DSPy深度研究 — Signature/BootstrapFewShot/MIPRO/集成方案
 
@@ -315,7 +412,7 @@ Save/Load（.json序列化，跨环境复用）
 6. **任务类型判断要结合上下文** — 同一句话在不同上下文中可能是简单或复杂任务
 7. **自动补全建议要具体** — 不要说"建议添加约束"，要说"建议添加：不超过50页、用中文"
 
-## 第五章：Prompt链式调用（Prompt Chaining）⭐ 第四轮研究新增
+## 第六章：Prompt链式调用（Prompt Chaining）⭐ 第四轮研究新增
 
 > 来源：Anthropic官方文档、LangChain社区、OpenAI Cookbook、实战经验
 > 完整研究报告：references/prompt-chaining-research.md
