@@ -684,4 +684,215 @@ InputGuardrail(
   不读写交织
 ```
 
+## 第十七章：Tool Use 错误处理最佳实践⭐ 第八轮学习新增
+
+> 来源：Anthropic Tool Use Guide、OpenAI Function Calling、LangChain Toolkits、Google Gemini Function Calling、学术研究（ToolBench、Gorilla、ToolLLM）
+
+### 17.1 工具调用失败的 4 种类型
+
+| 类型 | 表现 | 根因 | 策略 |
+|------|------|------|------|
+| **① 参数错误** | 400/422、schema 校验失败 | 模型生成了不合法参数（类型错、缺必填、格式错） | 重试 + 错误消息反馈给模型 |
+| **② 运行时错误** | 500、timeout、网络中断 | 工具服务端故障、资源不足 | 指数退避重试 → 降级到备选工具 |
+| **③ 语义错误** | 返回 200 但结果无意义 | 模型幻觉了参数值（如不存在的文件路径、假 URL） | 输出验证 + 参数修正重试 |
+| **④ 权限错误** | 401/403、沙箱限制 | 缺少凭证、超出工具权限范围 | 告知用户 → 切换到有权限的工具 |
+
+**每种类型的处理流程：**
+
+```
+参数错误 → 将原始错误信息原样返回给模型 → 模型自动修正参数 → 重试（最多3次）
+运行时错误 → 等待 2^n 秒 → 重试（最多3次）→ 仍失败则降级
+语义错误 → 验证输出 → 返回"结果不可信，请用不同参数重试" → 模型调整 → 重试
+权限错误 → 不重试 → 直接告知用户缺少权限 → 建议替代方案
+```
+
+### 17.2 参数幻觉检测与修正
+
+**模型最容易产生的 5 类参数幻觉：**
+
+| 幻觉类型 | 示例 | 检测方法 |
+|----------|------|---------|
+| **路径幻觉** | `read_file("/src/main.py")` 但文件不存在 | 调用前 `search_files` 验证路径 |
+| **ID 幻觉** | `get_issue(99999)` 但 issue 不存在 | 先 `list_issues()` 获取真实 ID |
+| **枚举幻觉** | `set_status("cancelled")` 但合法值是 `"canceled"` | schema 枚举校验 |
+| **格式幻觉** | 日期传 `"2024-13-45"` | 正则/类型校验 |
+| **语义幻觉** | `search("quantum computing")` 但目标库是生物学 | 任务上下文比对 |
+
+**修正策略（三级递进）：**
+
+```
+Level 1 — 自动修正（工具内部）
+  格式不合法 → 自动转换（日期格式、大小写、路径分隔符）
+  枚举近似 → 模糊匹配最接近的合法值（"cancelled" → "canceled"）
+
+Level 2 — 反馈修正（返回给模型）
+  将错误信息 + 合法值列表 + 原始意图 一起返回给模型
+  示例返回：
+    "Error: file '/src/main.py' not found.
+     Did you mean one of these?
+     - src/main.py
+     - src/app/main.py
+     Please retry with the correct path."
+
+Level 3 — 人工介入
+  连续3次参数幻觉 → 停止重试 → 向用户确认正确参数
+```
+
+**关键原则：永远将工具的原始错误信息传回模型，不要自己编造错误摘要。** 模型能从具体错误信息中学习并修正，但从模糊描述中不能。
+
+### 17.3 工具输出验证方法
+
+**验证层级（由浅到深）：**
+
+```
+L1 — 结构验证：输出是否符合预期 schema？类型是否正确？
+L2 — 存在性验证：输出中引用的实体是否存在？（文件、URL、ID）
+L3 — 一致性验证：输出是否与输入/上下文矛盾？
+L4 — 语义验证：输出是否回答了原始问题？
+```
+
+**实战验证模式：**
+
+```python
+# === 结构验证 ===
+result = terminal("python -c 'import json; json.load(open(\"output.json\"))'")
+assert result["exit_code"] == 0, "Output is not valid JSON"
+
+# === 存在性验证 ===
+# 工具返回了文件列表 → 抽样验证文件确实存在
+for path in claimed_files[:3]:
+    check = terminal(f"test -f {shell_quote(path)} && echo OK")
+    assert "OK" in check["output"], f"File hallucinated: {path}"
+
+# === 一致性验证 ===
+# 工具声称修改了文件 → 读取验证变更确实存在
+read_result = read_file("modified.py")
+assert "expected_change" in read_result["content"], "Change not applied"
+
+# === 语义验证 ===
+# 工具返回了分析结果 → 检查是否覆盖了所有问题
+user_questions = ["Q1", "Q2", "Q3"]
+for q in user_questions:
+    assert q in analysis_result, f"Question not addressed: {q}"
+```
+
+**输出大小 Guardrail：**
+```python
+# 超大输出 → 截断 + 告知模型用 offset/limit 分页
+if len(output) > 100_000:
+    return f"Output too large ({len(output)} chars). First 2000 chars:\n{output[:2000]}\n... Use offset/limit to read more."
+```
+
+### 17.4 降级策略（主工具失败时的备选方案）
+
+**降级链设计原则：**
+- 每个主工具必须有 0-2 个备选工具
+- 备选工具的精度/功能 ≤ 主工具（宁可降低质量也要保证进度）
+- 降级时必须告知用户（不静默降级）
+
+**常见降级链：**
+
+```
+# 1. 搜索类
+web_search → curl + grep → session_search（本地历史）
+
+# 2. 文件操作类
+patch（精确替换）→ terminal("sed")（正则替换）→ read + write_file（全量重写）
+
+# 3. 代码执行类
+terminal("python script.py") → execute_code（Hermes沙箱）→ 解释性回答（不执行）
+
+# 4. 浏览器类
+browser_navigate + browser_click → curl + 解析 → 告知用户手动操作
+
+# 5. 文档生成类
+python-docx 精确控制 → pandoc 格式转换 → Markdown 原始输出
+
+# 6. 外部 API 类
+官方 SDK → curl REST API → 从文档手动构造请求 → 告知用户 API 不可用
+```
+
+**降级决策模板：**
+```
+尝试主工具 (attempt 1/3) → 失败: {error}
+重试主工具 (attempt 2/3) → 失败: {error}
+重试主工具 (attempt 3/3) → 失败: {error}
+降级到备选工具: {fallback_tool} → 告知用户: "使用 {fallback} 代替 {primary}，精度可能降低"
+```
+
+### 17.5 错误处理完整流程图
+
+```
+工具调用
+  ↓
+[Input Guardrail] → 参数合法？ → No → reject_content → 模型修正 → 重试
+  ↓ Yes
+[执行工具]
+  ↓
+[Output Guardrail] → 输出安全？ → No → raise_exception → 停止
+  ↓ Yes
+[输出验证 L1-L4]
+  ↓
+  ├─ 通过 → 返回结果
+  ├─ 结构错误 → 返回错误信息给模型 → 重试
+  ├─ 语义错误 → 返回"结果不可信" → 重试（换参数）
+  └─ 连续失败 ≥3 → 降级到备选工具
+                         ↓
+                   ├─ 降级成功 → 返回结果（标注已降级）
+                   └─ 降级失败 → 告知用户 → 请求人工介入
+```
+
+### 17.6 实战代码模板
+
+```python
+async def robust_tool_call(tool_name, args, max_retries=3):
+    """带错误处理的工具调用模板"""
+    errors = []
+    for attempt in range(max_retries):
+        try:
+            # Input Guardrail
+            gr = check_input_guardrails(tool_name, args)
+            if gr.behavior == "reject_content":
+                args = await model_fix_args(tool_name, args, gr.message)
+                continue
+            if gr.behavior == "raise_exception":
+                raise ToolBlocked(gr.message)
+
+            # 执行
+            result = await execute_tool(tool_name, args)
+
+            # Output Guardrail
+            gr = check_output_guardrails(tool_name, result)
+            if gr.behavior == "reject_content":
+                errors.append(gr.message)
+                continue
+            if gr.behavior == "raise_exception":
+                raise ToolBlocked(gr.message)
+
+            # 输出验证
+            validation = validate_output(tool_name, result)
+            if not validation.ok:
+                errors.append(validation.error)
+                continue
+
+            return result  # 成功
+
+        except ToolTimeout:
+            errors.append(f"Timeout on attempt {attempt+1}")
+            await asyncio.sleep(2 ** attempt)  # 指数退避
+        except ToolError as e:
+            errors.append(str(e))
+            if not is_retryable(e):
+                break  # 权限错误等不可重试
+
+    # 所有重试失败 → 降级
+    fallback = get_fallback(tool_name)
+    if fallback:
+        return await fallback.execute(args, degraded=True)
+    else:
+        raise ToolExhausted(f"All {max_retries} attempts failed: {errors}")
+```
+
+---
+
 **Harness 层的价值不在于限制 Agent 的能力，而在于让 Agent 的行为可预测、可验证、可信赖。**

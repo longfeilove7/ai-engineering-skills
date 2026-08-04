@@ -74,3 +74,9 @@
 - context-engineering: 新增上下文压缩四技术（Gist Tokens/AutoCompressor/LLMLingua/Selective Context）
 - loop-engineering: 新增OPRO优化技术（历史嵌入+自然语言目标+多样性注入）
 - loop-engineering: 新增双模型架构（优化器强模型+评分器工具）
+
+## v2.1.0 (2026-08-04) — 第十二轮深度学习
+- prompt-engineering: 新增Prompt Chaining最佳实践（MISO分解+5种Chain模式+错误门控）
+- harness-engineering: 新增Tool Use错误处理4类型+参数幻觉检测+4级输出验证+6条降级链
+- graph-engineering: 新增任务分解量化评分+依赖图自动构建+动态负载均衡
+- 来源：Anthropic官方指南、OpenAI Agents SDK、创新研究

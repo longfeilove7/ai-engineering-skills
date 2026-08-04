@@ -302,6 +302,43 @@ todo(todos=[
 ])
 ```
 
+### 任务依赖图自动构建⭐ 第九轮深化
+
+> 完整报告：`references/task-decomposition-strategies.md`
+
+**三阶段构建：LLM分解 → 规则推断依赖 → 拓扑排序提取并行层**
+
+```python
+# 核心：基于文件读写关系自动推断依赖（无需LLM）
+def build_dependency_graph(subtasks):
+    for t1, t2 in combinations(subtasks, 2):
+        if t1.writes & t2.reads:  # T2读了T1写的 → 依赖
+            dag[t2.id].deps.add(t1.id)
+        if t1.writes & t2.writes:  # 写冲突 → 强制串行
+            dag[t2.id].deps.add(t1.id)
+    return topological_layers(dag)  # → 同层可并行
+```
+
+### 动态负载均衡⭐ 第九轮深化
+
+```python
+# 最小负载 + 文件亲和性 + 能力匹配
+class LoadBalancer:
+    def assign(self, task):
+        candidates = [a for a in self.agents if a.role == task.role and a.is_available]
+        candidates.sort(key=lambda a: (a.load, a.avg_task_time))
+        # 文件亲和性加分：之前处理过相同文件的Agent优先
+        return candidates[0]
+```
+
+### 并行编排模式⭐ 第九轮深化
+
+| 拓扑 | 实现 | 写约束 |
+|------|------|--------|
+| 串行 | advisor→executor→verifier→review | 单executor |
+| 并行 | asyncio.gather + 扇入verifier | 文件集不重叠 |
+| DAG | 拓扑排序 → 按层执行 → 层间传递结果 | 同层不重叠，跨层可重叠 |
+
 ## 反模式（避免）
 
 1. **executor创新** — executor不应该做计划外的改动
