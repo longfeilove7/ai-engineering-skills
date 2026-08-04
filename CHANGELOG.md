@@ -117,3 +117,9 @@
 - graph-engineering: 新增可扩展性（Agent池化+弹性扩缩容+6种负载均衡+大规模优化）
 - ai-engineering: 新增可观测性（执行链路追踪+决策可视化+异常检测+性能瓶颈分析）
 - 来源：角色适配研究、Agent池化架构、TraceSpan数据结构
+
+## v2.8.0 (2026-08-04) — 第十九轮深度学习
+- prompt-engineering: 新增上下文感知动态Prompt生成（三层架构+情绪调整+阶段检测+演化策略）
+- context-engineering: 新增跨会话传承（四层架构+会话结束自动提取+记忆版本控制）
+- loop-engineering: 新增知识积累和复用（双通道路由+TTL时效性+语义回滚+探索率≥20%）
+- 来源：COVE(2608.01234)、ChronoMem、SciToolAgent-Evo

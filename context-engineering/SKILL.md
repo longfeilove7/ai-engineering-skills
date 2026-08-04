@@ -968,3 +968,53 @@ vision_analyze(image_url="screenshot.png", question="这里有什么错误？")
 ```
 
 详见：`references/context-personalization.md`
+
+## 二十三、跨会话上下文传承⭐ 第二十三轮深度研究
+
+> 来源：Hermes Agent架构分析 + Mem0 ADD-only + Graphiti时序图 + LangGraph Checkpointers
+
+**核心问题：LLM无状态，每次新会话从零开始。如何精准传承关键上下文？**
+
+### 23.1 四层自动加载架构
+
+| 层 | 机制 | 加载时机 | 信息量 |
+|---|------|---------|--------|
+| **L0 持久人格** | MEMORY.md/USER.md | 每次自动注入 | 用户偏好、核心约束 |
+| **L1 主动记忆** | memory_save/recall | 首条消息触发 | 关键决策、项目状态 |
+| **L2 会话索引** | session_search(FTS5) | 按需检索 | 历史对话片段 |
+| **L3 外部知识** | 文件系统 + RAG | 按需读取 | 文档、代码、配置 |
+
+### 23.2 项目上下文分层模型
+
+```
+Project Identity Layer (永久) → 项目名/客户/预算/核心约束
+Decision Layer (结构化+时间戳) → 关键决策+原因+影响
+Working Layer (当前活跃) → 当前任务/进行中工作
+Archive Layer (压缩索引) → 已完成任务索引/历史版本引用
+```
+
+### 23.3 会话间知识迁移三种模式
+
+| 模式 | 机制 | 优点 | 缺点 |
+|------|------|------|------|
+| **显式迁移** | memory_save→recall | 精准可控 | 依赖Agent主动存储 |
+| **自动提取** | 会话结束LLM提取 | 不遗漏 | 可能提取噪音 |
+| **搜索迁移** | session_search跨会话 | 无需预存储 | 依赖关键词匹配 |
+
+### 23.4 上下文版本控制四种策略
+
+| 策略 | 实现 | 适用场景 |
+|------|------|---------|
+| **事件溯源** | ADD-only日志，不删除旧版本 | Mem0 2026模式，审计需求 |
+| **Git式版本** | MEMORY.md + git commit | 配置类知识，可diff |
+| **时序窗口** | valid_from/valid_to时间戳 | Graphiti模式，时序推理 |
+| **语义版本** | MAJOR.MINOR.PATCH for Skills | 程序性知识，兼容性管理 |
+
+### 23.5 Hermes已有优势与差距
+
+**已有**：L0自动注入 + ADD-only语义记忆 + FTS5检索 + Skill版本化 + Context Compaction
+**缺失**：会话结束自动提取、记忆衰减、记忆冲突检测、快照恢复
+
+**改进优先级**：P0会话结束自动提取模板 → P1 MEMORY.md git版本控制 → P2 记忆时间衰减 → P3 冲突检测
+
+详见：`references/cross-session-context-inheritance.md`
