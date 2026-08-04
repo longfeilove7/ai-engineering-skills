@@ -471,6 +471,34 @@ Level 4: 业务检查
 
 ---
 
+## 第八章：Guardrails机制⭐ 第二轮学习新增
+
+> 来源：OpenAI Agents SDK — 3级安全护栏
+
+**核心理念：在工具调用的输入/输出/执行三个阶段设置安全检查。**
+
+| 级别 | 检查点 | 检查内容 |
+|------|--------|---------|
+| **Input** | 工具调用前 | 参数合法性、权限检查、注入检测 |
+| **Output** | 工具返回后 | 结果大小、敏感信息、错误码 |
+| **Tool** | 工具选择时 | 工具是否在允许列表、是否需要确认 |
+
+在Hermes中的实践：terminal命令检查dangerous关键词，文件输出检查大小。
+
+## 第九章：Handoffs-as-Tools⭐ 第二轮学习新增
+
+> 来源：OpenAI Agents SDK — Handoffs建模为工具
+
+**核心理念：Agent间任务转移不是特殊指令，而是一个标准工具调用（transfer_to_xxx）。**
+
+Input Filters在Handoff时过滤输入减少token。在Hermes中，delegate_task的context参数就是Input Filter。
+
+## 第十章：Checkpointer检查点⭐ 第二轮学习新增
+
+> 来源：LangGraph — Checkpointers故障恢复
+
+**核心理念：长任务定期保存状态，失败时从检查点恢复。** 在Hermes中用todo跟踪进度，每个completed项就是一个检查点。
+
 ## 记忆锚点
 
 ```

@@ -118,6 +118,29 @@ blockers: 阻塞问题（如有）
 
 ## Stackwich Policy Block（精华版）
 
+### CrewAI双层架构参考⭐ 第二轮学习新增
+
+> 来源：CrewAI v1.15 — Flows + Crews双层架构
+
+| 层 | 说明 |
+|---|------|
+| **Flows** | 事件驱动工作流，控制整体流程 |
+| **Crews** | 角色扮演Agent团队，执行具体任务 |
+
+角色系统：role/goal/backstory三要素定义Agent人格。
+
+### AutoGen事件驱动参考⭐ 第二轮学习新增
+
+> 来源：AutoGen v0.4 — 3层架构
+
+| 层 | 说明 |
+|---|------|
+| **Core** | 基础消息传递和事件系统 |
+| **AgentChat** | 高级Agent对话API |
+| **Extensions** | 第三方集成 |
+
+核心：事件驱动、异步优先、GraphFlow工作流。
+
 以下内容来自stackwich的CLAUDE.md policy block，是经过实战验证的行为准则：
 
 ### Prompt层
