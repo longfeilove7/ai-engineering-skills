@@ -299,6 +299,45 @@ cd ~/.hermes/skills/productivity/ai-engineering-skills
 
 三者协同进化，解决"任务多样性vs验证可靠性"两难。
 
+## 第九章：跨层优化⭐ 第十五轮学习新增
+
+**当前问题：5层各自独立运行，层间信息流断裂。**
+
+### 9.1 四个标准数据结构
+
+| 结构 | 流向 | 内容 |
+|------|------|------|
+| TaskCard | Prompt→所有层 | 任务描述+约束+完成条件 |
+| ContextBudget | Context→Harness | token预算+优先级 |
+| ExecResult | Harness→Loop | 执行结果+错误信息 |
+| QualityVec | Loop→所有层 | 多维度质量评分+故障归因 |
+
+### 9.2 六条反馈回路
+
+| 回路 | 触发 | 动作 |
+|------|------|------|
+| Loop→Prompt | 质量分<7 | 改进prompt策略 |
+| Loop→Context | 信息不足 | 补充上下文 |
+| Loop→Harness | 工具失败 | 换工具或修正参数 |
+| Context→Harness | token接近上限 | 启用压缩 |
+| Graph→全局 | 故障归因 | 更新skill pitfalls |
+| Harness→Graph | Guardrail触发 | 调整任务分配 |
+
+### 9.3 三层门控体系
+
+```
+入口门控（Prompt质量）→ 执行门控（Guardrails）→ 交付门控（质量+收敛）
+```
+
+### 9.4 预期收益
+
+| 指标 | 预期改善 |
+|------|---------|
+| 任务成功率 | +15% |
+| 迭代次数 | -28% |
+| Token浪费 | -50% |
+| 故障定位时间 | -80% |
+
 ## Pitfalls
 
 1. **不要过度反思** — 简单任务不需要反思

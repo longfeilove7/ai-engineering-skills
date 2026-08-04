@@ -92,3 +92,10 @@
 - context-engineering: 新增多模态上下文管理（Progressive Image Disclosure、4层代码分层、10级裁剪顺序）
 - loop-engineering: 新增A/B测试+版本管理（版本树、5种最佳版本选择、迭代历史可视化）
 - 来源：Anthropic/OpenAI最佳实践、ColPali、OPRO
+
+## v2.4.0 (2026-08-04) — 第十五轮深度学习（最终版）
+- prompt-engineering: 新增Prompt安全防护（OWASP 7条防御+四层防护架构）
+- harness-engineering: 新增工具路由矩阵（关键词/嵌入/Few-shot路由）
+- harness-engineering: 新增三层结果缓存（L1结果/L2路径/L3分析）
+- ai-engineering: 新增跨层优化（4个标准数据结构+6条反馈回路+三层门控）
+- 来源：OWASP LLM Top 10、跨层优化研究
