@@ -51,3 +51,11 @@
 - loop-engineering: 新增收敛判据（Delta评分法）
 - loop-engineering: 新增质量追踪向量（多维度评分）
 - 来源：Huang et al. (2310.01798), CRITIC (2305.11738), Self-Consistency (2203.11171)
+
+## v1.8.0 (2026-08-04) — 第十轮聚焦学习改进
+- prompt-engineering: 新增第三章（缺失要素检测+自动补全+框架选择指南）
+- context-engineering: 新增LazyMem查询时压缩（21x token节省）
+- context-engineering: 新增工具输出生命周期管理（MemTool）
+- context-engineering: 新增记忆生命周期操作（MemOps）
+- context-engineering: 新增Router-Mem渐进执行（减少27%推理时间）
+- 来源：LazyMem(2026.7), MemTool(2025.7), MemOps(2026.7), Router-Mem(2026.8)
