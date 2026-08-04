@@ -59,3 +59,12 @@
 - context-engineering: 新增记忆生命周期操作（MemOps）
 - context-engineering: 新增Router-Mem渐进执行（减少27%推理时间）
 - 来源：LazyMem(2026.7), MemTool(2025.7), MemOps(2026.7), Router-Mem(2026.8)
+
+## v1.9.0 (2026-08-04) — Harness+Graph层聚焦改进
+- harness-engineering: 新增Guardrails三行为模式（allow/reject_content/raise_exception）
+- harness-engineering: 新增Guardrails并行执行+快速取消
+- graph-engineering: 新增Handoff上下文过滤（HandoffInputFilter）
+- graph-engineering: 新增Handoff历史压缩（nest_handoff_history）
+- graph-engineering: 新增任务自动分解规则（≥5文件spawn）
+- graph-engineering: 新增Agent选择策略
+- 来源：OpenAI Agents SDK源码分析、LangGraph

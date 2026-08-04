@@ -116,6 +116,108 @@ next: 下一个阶段和需要的信息
 blockers: 阻塞问题（如有）
 ```
 
+### 交接上下文过滤⭐ 第八轮学习新增
+
+> 来源：OpenAI Agents SDK — HandoffInputData + HandoffInputFilter + nest_handoff_history
+
+**交接时不是传递全部历史，而是过滤后传递。**
+
+源码结构 (`handoffs/__init__.py:42-90`):
+```python
+@dataclass(frozen=True)
+class HandoffInputData:
+    input_history: str | tuple          # 原始输入
+    pre_handoff_items: tuple[RunItem]   # 交接前 items
+    new_items: tuple[RunItem]           # 当前 turn items
+    input_items: tuple[RunItem] | None  # 过滤后的输入（替代 new_items）
+
+HandoffInputFilter = Callable[[HandoffInputData], HandoffInputData]
+```
+
+**内置过滤器** (`extensions/handoff_filters.py:33-56`):
+```python
+def remove_all_tools(handoff_input_data):
+    """过滤掉所有工具调用/输出，只保留用户消息和Agent回复"""
+    # 移除：function_call, function_call_output, computer_call, web_search_call...
+    # 保留：user messages, assistant messages
+    return handoff_input_data.clone(
+        input_history=filtered_history,
+        pre_handoff_items=filtered_pre_handoff,
+        new_items=filtered_new_items,
+    )
+```
+
+**历史嵌套** (`handoffs/history.py:83-157`):
+```python
+def nest_handoff_history(handoff_input_data, *, history_mapper=None):
+    """将之前的对话转录压缩为一个摘要消息"""
+    # 输出格式：
+    # "For context, here is the conversation so far between the user and the previous agent:
+    #  <CONVERSATION HISTORY>
+    #  1. user: 我需要修改配置文件
+    #  2. assistant: 我来帮你修改...
+    #  </CONVERSATION HISTORY>"
+```
+
+**Hermes 实践（delegate_task 改进）：**
+```python
+# 当前：传递全部上下文（token浪费）
+delegate_task(goal="...", context=all_history)
+
+# 改进：过滤后传递
+def build_handoff_context(full_history, goal):
+    return {
+        "goal": goal,
+        "relevant_files": extract_file_refs(full_history, goal),
+        "completed_steps": extract_completed(full_history),
+        "constraints": extract_constraints(full_history),
+        # 不传递：其他任务历史、中间推理、工具调用细节
+    }
+delegate_task(goal="执行修改", context=build_handoff_context(history, goal))
+```
+
+### 任务自动分解⭐ 第八轮学习新增
+
+**判断一个任务需要几个Agent：**
+
+```python
+def should_spawn_executor(task):
+    if task.affected_files >= 5:          # 大批次
+        return True
+    if task.read_operations > 20:         # 读取密集型，会污染主上下文
+        return True
+    if task.is_reversible and task.affected_files < 3:  # 小且可逆
+        return False
+    if task.depends_on_other_tasks:       # 有依赖，保持串行
+        return False
+    return False  # 默认单独工作
+```
+
+| 维度 | 单Agent | 多Agent串行 | 多Agent并行 |
+|------|---------|------------|------------|
+| 文件数 | <3 | 3-10 | >10 且无交叉 |
+| 复杂度 | 简单修改 | 需要验证 | 独立子任务 |
+| 可逆性 | 可逆 | 不可逆 | 可逆 |
+| 依赖关系 | 无 | 有顺序依赖 | 无依赖 |
+
+### Agent选择策略⭐ 第八轮学习新增
+
+```python
+def select_agent(task, available_agents):
+    if task.has_write_operations:
+        if task.is_mechanical:
+            return "executor"  # 机械执行
+        else:
+            return "advisor"   # 复杂写入先规划
+    if task.is_verification:
+        return "verifier"
+    if task.is_planning or task.is_review:
+        return "advisor"
+    if task.is_small and task.is_reversible:
+        return "executor"      # 小任务直接执行
+    return "advisor"           # 默认先规划
+```
+
 ## Stackwich Policy Block（精华版）
 
 ### CrewAI双层架构参考⭐ 第二轮学习新增

@@ -511,6 +511,157 @@ Input Filters在Handoff时过滤输入减少token。在Hermes中，delegate_task
 
 **对Harness层启示：** 工具选择时，优先专用工具而非通用大模型。
 
+## 第十三章：Tool Guardrail 三行为模式⭐ 第七轮学习新增
+
+> 来源：OpenAI Agents SDK `tool_guardrails.py` — ToolGuardrailFunctionOutput
+
+**传统 guardrail 只有通过/拒绝。OpenAI 引入第三种行为：拒绝但继续。**
+
+| 行为 | 效果 | 适用场景 |
+|------|------|---------|
+| `allow` | 正常执行 | 检查通过 |
+| `reject_content` | 拒绝工具调用/输出，给模型发消息让它重试 | 格式错误但意图正确 |
+| `raise_exception` | 抛异常停止执行 | 安全违规、不可恢复错误 |
+
+**源码实现** (`tool_guardrails.py:59-117`):
+```python
+@dataclass
+class ToolGuardrailFunctionOutput:
+    output_info: Any
+    behavior: RejectContentBehavior | RaiseExceptionBehavior | AllowBehavior
+
+    @classmethod
+    def allow(cls, output_info=None):
+        return cls(output_info=output_info, behavior=AllowBehavior(type="allow"))
+
+    @classmethod
+    def reject_content(cls, message: str, output_info=None):
+        return cls(output_info=output_info,
+                   behavior=RejectContentBehavior(type="reject_content", message=message))
+
+    @classmethod
+    def raise_exception(cls, output_info=None):
+        return cls(output_info=output_info,
+                   behavior=RaiseExceptionBehavior(type="raise_exception"))
+```
+
+**执行流程** (`run_internal/tool_execution.py:2478-2549`):
+```python
+# Tool Input Guardrail
+for guardrail in func_tool.tool_input_guardrails:
+    gr_out = await guardrail.run(ToolInputGuardrailData(context=tool_context, agent=agent))
+    if gr_out.behavior["type"] == "raise_exception":
+        raise ToolInputGuardrailTripwireTriggered(guardrail=guardrail, output=gr_out)
+    elif gr_out.behavior["type"] == "reject_content":
+        return gr_out.behavior["message"]  # 返回消息给模型让它重试
+
+# Tool Output Guardrail
+for output_guardrail in func_tool.tool_output_guardrails:
+    gr_out = await output_guardrail.run(
+        ToolOutputGuardrailData(context=tool_context, agent=agent, output=real_result))
+    if gr_out.behavior["type"] == "raise_exception":
+        raise ToolOutputGuardrailTripwireTriggered(...)
+    elif gr_out.behavior["type"] == "reject_content":
+        return _ToolOutputGuardrailExecutionResult(gr_out.behavior["message"], is_rejection=True)
+```
+
+**Hermes 完整实践（三级检查）：**
+```python
+# === Level 1: Input Guardrail — 工具调用前 ===
+def check_terminal_input(data):
+    command = data.context.tool_call.arguments.get("command", "")
+    if any(d in command for d in ["rm -rf /", "mkfs", "dd if="]):
+        return ToolGuardrailFunctionOutput.raise_exception(f"Dangerous: {command}")
+    if "sudo" in command and not data.context.get("sudo_confirmed"):
+        return ToolGuardrailFunctionOutput.reject_content("sudo requires confirmation")
+    return ToolGuardrailFunctionOutput.allow()
+
+# === Level 2: Output Guardrail — 工具返回后 ===
+def check_file_output(data):
+    if isinstance(data.output, str) and len(data.output) > 100_000:
+        return ToolGuardrailFunctionOutput.reject_content(
+            f"Output too large ({len(data.output)} chars). Use offset/limit.")
+    if isinstance(data.output, str) and "PRIVATE KEY" in data.output:
+        return ToolGuardrailFunctionOutput.raise_exception("Sensitive data detected")
+    return ToolGuardrailFunctionOutput.allow()
+
+# === Level 3: Agent Output Guardrail — 最终输出 ===
+@output_guardrail
+def check_no_hallucination(ctx, agent, output):
+    paths = re.findall(r'/[\w/]+\.\w+', str(output))
+    for p in paths:
+        if not os.path.exists(p):
+            return GuardrailFunctionOutput(output_info=f"Hallucinated: {p}", tripwire_triggered=True)
+    return GuardrailFunctionOutput(output_info="OK", tripwire_triggered=False)
+```
+
+**关键优势：`reject_content` 比直接拒绝更高效** — 不浪费一次 agent 调用，模型收到反馈后自动修正。
+
+## 第十四章：HandoffInputData 上下文过滤⭐ 第七轮学习新增
+
+> 来源：OpenAI Agents SDK `handoffs/__init__.py` — HandoffInputData + HandoffInputFilter
+
+**交接时不是传递全部历史，而是过滤后传递。**
+
+```python
+@dataclass
+class HandoffInputData:
+    input_history: str | tuple        # 原始输入
+    pre_handoff_items: tuple[RunItem] # 交接前 items
+    new_items: tuple[RunItem]         # 当前 turn items
+    input_items: tuple[RunItem] | None # 过滤后的输入（替代 new_items）
+
+HandoffInputFilter = Callable[[HandoffInputData], HandoffInputData]
+```
+
+**Hermes 实践（delegate_task 的 context 参数）：**
+```python
+# 当前：传递全部上下文
+delegate_task(goal="...", context=all_history)  # token 浪费
+
+# 改进：过滤后传递
+def handoff_filter(data: HandoffInputData) -> HandoffInputData:
+    return data.clone(
+        input_items=keep_only_relevant(data.new_items, goal),
+        new_items=data.new_items  # 保留完整历史用于 session
+    )
+```
+
+**nest_handoff_history=True 时，长对话中压缩历史为摘要，避免 context window 爆炸。**
+
+## 第十五章：Channel 机制 — 框架级单写入者⭐ 第七轮学习新增
+
+> 来源：LangGraph — LastValue + BinaryOperatorAggregate
+
+**LangGraph 在框架层用 Channel 强制单写入者语义：**
+
+| Channel 类型 | 语义 | 用途 |
+|-------------|------|------|
+| `LastValue` | 同一 key 只保留最后写入者的值 | `next_agent`, `status` |
+| `BinaryOperatorAggregate` | 用 reducer 合并多次写入 | `messages` (add_messages) |
+| `EphemeralValue` | 单次读取后清除 | 一次性信号 |
+
+**Hermes 实践：write_targets 声明 + 冲突检测已是 LastValue 语义。可进一步：**
+- 定义 `reducers`：对 `messages` 类字段用 append，对 `config` 类字段用 last-write-wins
+- 交接时用 `Command(goto=target)` 显式路由，而非隐式状态传递
+
+## 第十六章：并行 Guardrail⭐ 第七轮学习新增
+
+> 来源：OpenAI Agents SDK — InputGuardrail.run_in_parallel
+
+**guardrail 可以与 agent 并行执行，不增加延迟：**
+```python
+InputGuardrail(
+    guardrail_function=check_safety,
+    run_in_parallel=True  # 与 agent 同时运行
+)
+```
+
+**如果 guardrail 先完成且触发 tripwire → 取消 agent 执行。**
+**如果 agent 先完成 → guardrail 结果作为后置检查。**
+
+---
+
 ## 记忆锚点
 
 ```
