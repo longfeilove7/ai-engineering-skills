@@ -700,6 +700,44 @@ Linear Scaling → NTK-aware → **YaRN**（分频段混合插值） → **ABF**
 
 在Loop层中的应用：每轮迭代不仅检查最终结果，也检查中间步骤。
 
+## 十四、Agent记忆系统架构⭐ 第七轮学习新增
+
+> 来源：MemGPT/Letta、Mem0、Graphiti、Cognee
+
+### 14.1 四种跨会话持久化模式
+
+| 模式 | 代表 | 特点 |
+|------|------|------|
+| Agent-Native | Letta | OS式虚拟内存管理 |
+| Memory-as-a-Service | Mem0 | ADD-only算法，92.5 LoCoMo |
+| Graph-Backed | Graphiti | 时序Context Graph |
+| Store-Backed | LangMem | PostgreSQL + 自动提取 |
+
+### 14.2 三层记忆体系（Mem0）
+
+| 层 | 类型 | 说明 |
+|---|------|------|
+| User | 语义记忆 | 用户偏好、事实 |
+| Session | 情景记忆 | 单次会话上下文 |
+| Agent | 程序记忆 | 技能、工具使用经验 |
+
+### 14.3 时序记忆（Graphiti）
+
+每个fact带`valid_from/valid_to`时间窗口，支持历史推理。
+
+### 14.4 在Hermes中的实践
+
+Hermes已有memory_save/memory_recall，对应Mem0的User层：
+- type=fact → 语义记忆
+- type=pattern → 程序记忆
+- type=workflow → 情景记忆
+
+## 十五、Durable Execution⭐ 第七轮学习新增
+
+> 来源：Temporal — 崩溃后精确恢复
+
+**核心理念：工作流执行状态持久化，崩溃后从断点恢复。** 在Hermes中用todo跟踪进度，每个completed项就是持久化检查点。
+
 1. **信息囤积症** — 不舍得丢弃上下文中的信息，导致窗口溢出、推理质量下降。**解法**：信任memory_save，信息存了就能找回来。
 
 2. **记忆碎片化** — 每条信息都存，但没有结构，检索时找不到。**解法**：用concepts标签分类存储，content要包含关键词。

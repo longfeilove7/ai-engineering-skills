@@ -37,3 +37,10 @@
 - harness-engineering: 新增单写入者+多读者模式（Cognition Devin验证）
 - harness-engineering: 新增专用小模型替代通用大模型（SWE-Check 10x快）
 - 来源：Cognition Devin、SWE-Check
+
+## v1.6.0 (2026-08-04) — 第七轮学习改进
+- context-engineering: 新增Agent记忆系统架构（MemGPT/Letta/Mem0/Graphiti）
+- context-engineering: 新增三层记忆体系（语义/情景/程序）
+- context-engineering: 新增时序记忆（Graphiti valid_from/valid_to）
+- context-engineering: 新增Durable Execution（Temporal崩溃恢复）
+- 来源：MemGPT、Mem0(YC S24)、Graphiti、Temporal
