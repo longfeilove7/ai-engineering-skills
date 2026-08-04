@@ -1,42 +1,47 @@
-# AI Engineering Skills — 5层架构
+# AI Engineering Skills — 5层架构 + 自我进化
 
-基于stackwich的5层架构理念，为Hermes Agent打造的AI Engineering Skill体系。
+基于stackwich的5层架构理念，为Hermes Agent打造的AI Engineering Skill体系，支持自我进化。
 
-## 五层架构
-
-| 层 | Skill | 职责 |
-|---|-------|------|
-| **Prompt** | prompt-engineering | 检查prompt七要素质量，提醒按要素写提示词 |
-| **Context** | context-engineering | 上下文窗口管理、信息压缩、多轮对话维护、RAG策略 |
-| **Harness** | harness-engineering | Agent编排策略、工具组合模式、单写入者原则、只读强制 |
-| **Loop** | loop-engineering | 迭代优化、自我反思、失败循环上限（最多2次）、质量门控 |
-| **Graph** | graph-engineering | 多Agent协作：advisor→executor→verifier完整闭环 |
-
-## 学习路径
+## 架构
 
 ```
-Prompt（写好提示词）
-  → Context（管理上下文）
-    → Harness（编排工具）
-      → Loop（迭代优化）
-        → Graph（多Agent协作）
+ai-engineering（总调度，Pin住）
+    ↓ 自动分析任务复杂度
+    ├─ Prompt层 → prompt-engineering
+    ├─ Context层 → context-engineering
+    ├─ Harness层 → harness-engineering
+    ├─ Loop层 → loop-engineering
+    └─ Graph层 → graph-engineering（含3个Agent）
 ```
+
+## 自我进化机制
+
+```
+执行任务 → 自我反思 → 存储学习 → 累积改进 → patch skill → 版本+1 → 推送GitHub
+```
+
+## 六个Skill
+
+| Skill | 职责 | 层 |
+|-------|------|---|
+| **ai-engineering** | 总调度+进化引擎 | 入口 |
+| **prompt-engineering** | 七要素prompt检查 | Prompt |
+| **context-engineering** | 上下文管理、压缩、RAG | Context |
+| **harness-engineering** | 工具编排、单写入者、只读 | Harness |
+| **loop-engineering** | 迭代优化、失败上限、质量门控 | Loop |
+| **graph-engineering** | 多Agent协作（advisor/executor/verifier） | Graph |
 
 ## 安装
 
 ```bash
-# 克隆到Hermes skills目录
 git clone https://github.com/longfeilove7/ai-engineering-skills.git ~/.hermes/skills/productivity/ai-engineering-skills
-
-# 或者单独安装某个skill
-cp -r prompt-engineering ~/.hermes/skills/productivity/
 ```
 
 ## 灵感来源
 
 - [stackwich](https://github.com/ovhirup/stackwich) — 5层架构理念
-- [dair-ai/Prompt-Engineering-Guide](https://github.com/dair-ai/Prompt-Engineering-Guide) — Prompt Engineering指南
-- [Meirtz/Awesome-Context-Engineering](https://github.com/Meirtz/Awesome-Context-Engineering) — Context Engineering综述
+- [dair-ai/Prompt-Engineering-Guide](https://github.com/dair-ai/Prompt-Engineering-Guide)
+- [Meirtz/Awesome-Context-Engineering](https://github.com/Meirtz/Awesome-Context-Engineering)
 
 ## License
 
