@@ -499,6 +499,18 @@ Input Filters在Handoff时过滤输入减少token。在Hermes中，delegate_task
 
 **核心理念：长任务定期保存状态，失败时从检查点恢复。** 在Hermes中用todo跟踪进度，每个completed项就是一个检查点。
 
+## 第十一章：单写入者+多读者模式⭐ 第六轮学习新增
+
+> 来源：Cognition Devin — $260亿估值AI软件工程师
+
+**Devin核心架构：单写入者+多读者的多Agent模式。** 与我们的Harness层"单一写入者"公理完全一致。
+
+## 第十二章：专用小模型替代通用大模型⭐ 第六轮学习新增
+
+> 来源：SWE-Check — 专用RL小模型做代码审查，快10x
+
+**对Harness层启示：** 工具选择时，优先专用工具而非通用大模型。
+
 ## 记忆锚点
 
 ```

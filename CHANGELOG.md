@@ -32,3 +32,8 @@
 - loop-engineering: 新增Reflexion框架集成（verbal reinforcement learning）
 - loop-engineering: 新增PRM步骤级评估
 - 来源：vLLM、Google Infini-Attention、Berkeley Ring Attention、Shinn et al. 2023
+
+## v1.5.0 (2026-08-04) — 第六轮学习改进
+- harness-engineering: 新增单写入者+多读者模式（Cognition Devin验证）
+- harness-engineering: 新增专用小模型替代通用大模型（SWE-Check 10x快）
+- 来源：Cognition Devin、SWE-Check
