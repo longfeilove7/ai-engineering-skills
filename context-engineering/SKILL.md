@@ -567,7 +567,138 @@ read_file(path="具体文件", offset=1, limit=100)
 | 网络研究 | web_search > web_extract > browser |
 | 文档处理 | docx > pdf > ocr |
 
-## 七、Pitfalls 常见陷阱
+## 十一、底层Attention优化技术 ⭐ 第五轮深度研究
+
+> 来源：2024-2025年前沿研究综述，详见 `~/context-engineering-deep-research.md`
+
+### 11.1 KV Cache 优化技术栈
+
+| 技术 | 原理 | 效果 | 代表工作 |
+|------|------|------|---------|
+| GQA/MQA | 多Query头共享KV头 | 4-8x KV减少 | LLaMA 3, Mistral |
+| PagedAttention | 虚拟内存分页管理KV | 消除碎片，3-4x吞吐 | vLLM |
+| KV量化 | FP16→INT8/INT4 | 2-4x内存节省 | KIVI, KVQuant |
+| Token驱逐 | 淘汰低重要性token的KV | 动态内存 | H2O, StreamingLLM |
+| Prefix Caching | 共享前缀复用KV | 多请求共享 | SGLang, vLLM |
+| MLA | 低秩latent压缩KV | ~1/10 KV大小 | DeepSeek-V2/V3 |
+
+### 11.2 Attention Sinks + StreamingLLM
+
+**发现**：LLM初始token（前4个）的attention权重异常高，充当"注意力垃圾桶"。
+
+**StreamingLLM方案**：`[Sink Tokens (前4)] + [Sliding Window (最近N个)]`
+- 固定内存，支持无限流式推理
+- 局限：无法回忆窗口外内容
+
+### 11.3 Infini-Attention（Google 2024）
+
+**核心**：标准attention + 压缩记忆矩阵，支持无限上下文。
+- 分段处理，历史段压缩为固定大小记忆矩阵M
+- 记忆更新：`M_s = M_{s-1} + σ(K_s)^T · V_s`
+- 门控融合：`output = gate · A_mem + (1-gate) · A_local`
+- 1B模型在1M序列上验证有效
+
+### 11.4 Ring Attention（Berkeley 2024）
+
+**核心**：多GPU环形通信分担长序列attention计算。
+- 序列分块→各设备并行计算→环形传递KV块→在线softmax归全
+- 上下文长度与GPU数量线性扩展
+- Striped Attention改进：条纹分配消除负载不均，快1.5x
+
+### 11.5 Differential Transformer（Microsoft 2024）
+
+```
+DiffAttn = softmax(Q₁K₁ᵀ)·V - λ·softmax(Q₂K₂ᵀ)·V
+```
+- 两个attention map做差消除噪声
+- 天然减少attention sinks，更好利用上下文中间部分
+
+### 11.6 位置编码外推演进
+
+Linear Scaling → NTK-aware → **YaRN**（分频段混合插值） → **ABF**（调整base频率）
+- LLaMA 3.1用YaRN从8K→128K
+- Gemini用ABF支持10M上下文
+
+### 11.7 Context Distillation 技术
+
+| 技术 | 原理 | 代表 |
+|------|------|------|
+| CoT蒸馏 | 强模型思维链→弱模型训练 | Orca, Phi |
+| 上下文压缩蒸馏 | 长文本→固定summary tokens | AutoCompressor |
+| Gisting | 长指令→~10个gist tokens | Gist Tokens |
+| Prompt蒸馏 | few-shot知识→零样本能力 | Meta ICD |
+
+### 11.8 Lost in the Middle 缓解
+
+**问题**：模型对上下文中间位置信息利用率低。
+**解法**：重要信息放首尾、分段摘要、显式标记、训练时随机放置。
+
+## 十一、底层Attention优化技术⭐ 第五轮学习新增
+
+> 来源：vLLM/Gemma/DeepSeek/Google/Berkeley最新研究
+
+### 11.1 KV Cache优化栈（6种可叠加技术）
+
+| 技术 | 原理 | 效果 |
+|------|------|------|
+| GQA/MQA | 多查询注意力，减少KV头数 | 内存减半 |
+| PagedAttention | 按页管理KV内存（vLLM核心） | 消除碎片 |
+| KV量化(KIVI) | 2bit量化KV Cache | 内存减75% |
+| Token驱逐(H2O) | 动态驱逐不重要token | 固定内存 |
+| Prefix Caching | 共享前缀复用KV | 命中率提升 |
+| MLA(DeepSeek) | 多头潜在注意力 | 压缩KV维度 |
+
+### 11.2 Infini-Attention（Google 2024）
+
+线性attention记忆矩阵压缩历史segment，门控融合局部+全局。1B模型验证1M序列。
+
+### 11.3 Ring Attention（Berkeley 2024）
+
+多GPU环形传递KV块，在线softmax归全，上下文长度线性扩展。
+
+### 11.4 Lost in the Middle
+
+**问题：** 中间信息利用率低，首尾信息被更好利用。
+
+**解法：**
+- 重要信息放首尾
+- 分段摘要
+- 训练增强
+
+### 11.5 Differential Transformer（Microsoft 2024）
+
+两组attention map做差消除噪声，天然减少attention sinks。
+
+## 十二、Reflexion自我反思框架⭐ 第五轮学习新增
+
+> 来源：Shinn et al. 2023 — verbal reinforcement learning
+
+**核心：失败后用自然语言反思存入长期记忆，下次自动规避。**
+
+| 步骤 | 动作 |
+|------|------|
+| 1. 执行 | Agent执行任务 |
+| 2. 评估 | 环境给出反馈 |
+| 3. 反思 | 用自然语言总结失败原因 |
+| 4. 存储 | 存入长期记忆 |
+| 5. 重试 | 下次自动参考反思 |
+
+效果：HumanEval 80→91%
+
+在Hermes中的实践：用memory_save存储反思，用memory_recall检索。
+
+## 十三、PRM过程奖励模型⭐ 第五轮学习新增
+
+> 来源：Lightman et al. 2023 + Math-Shepherd 2024
+
+**步骤级评估优于结果级评估(ORM)。**
+
+| 评估方式 | 粒度 | 效果 |
+|---------|------|------|
+| ORM | 只看最终结果 | 基准 |
+| PRM | 每步评估 | Best-of-N MATH 78.2% |
+
+在Loop层中的应用：每轮迭代不仅检查最终结果，也检查中间步骤。
 
 1. **信息囤积症** — 不舍得丢弃上下文中的信息，导致窗口溢出、推理质量下降。**解法**：信任memory_save，信息存了就能找回来。
 

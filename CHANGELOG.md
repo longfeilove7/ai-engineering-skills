@@ -24,3 +24,11 @@
 - harness-engineering: 新增Guardrails/Handoffs-as-Tools/Checkpointer
 - graph-engineering: 新增CrewAI双层架构/AutoGen事件驱动
 - 来源：14篇2024-2026年最新论文
+
+## v1.4.0 (2026-08-04) — 第五轮学习改进
+- context-engineering: 新增底层Attention优化技术（KV Cache 6种技术、Infini-Attention、Ring Attention、Lost in the Middle、Differential Transformer）
+- context-engineering: 新增Reflexion自我反思框架
+- context-engineering: 新增PRM过程奖励模型
+- loop-engineering: 新增Reflexion框架集成（verbal reinforcement learning）
+- loop-engineering: 新增PRM步骤级评估
+- 来源：vLLM、Google Infini-Attention、Berkeley Ring Attention、Shinn et al. 2023

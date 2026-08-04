@@ -136,6 +136,42 @@ next_action: "继续优化" | "升级到human"
 **结果：** 经过2轮迭代，质量从6分提升到9分。
 ```
 
+## Reflexion框架集成⭐ 第五轮学习新增
+
+> 来源：Shinn et al. 2023 — verbal reinforcement learning
+
+**失败后用自然语言反思存入长期记忆，下次自动规避。**
+
+```yaml
+reflexion_flow:
+  1_execute: "执行任务"
+  2_evaluate: "环境/verifier给出反馈"
+  3_reflect: "用自然语言总结：做错了什么、为什么错、下次怎么避免"
+  4_store: "存入memory(type: workflow)"
+  5_retry: "下次自动检索相关反思"
+```
+
+在Hermes中：
+```python
+# 反思后存储
+memory_save(content="在XX任务中，YY策略失败，原因是ZZ，下次应该用WW", type="workflow")
+
+# 下次执行前检索
+memory_recall(query="XX任务 策略 失败")
+```
+
+## PRM过程奖励集成⭐ 第五轮学习新增
+
+**步骤级评估优于结果级评估。**
+
+每轮迭代不仅检查最终结果，也检查中间步骤：
+
+| 检查点 | 评估内容 |
+|--------|---------|
+| 步骤1完成 | 输入→输出是否正确？ |
+| 步骤2完成 | 是否符合预期？ |
+| 最终结果 | 整体质量如何？ |
+
 ## Pitfalls
 
 1. **不要无限迭代** — 最多2次重试
