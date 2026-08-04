@@ -494,6 +494,79 @@ memory_smart_search(query="售前方案写作规范")
 
 ---
 
+## 八、Progressive Disclosure（渐进式披露）⭐ 第一轮学习新增
+
+> 来源：ratel-ai/ratel (406⭐) — 2026年最新Context Engineering实践
+
+**核心理念：按需加载信息，而不是一次性加载所有上下文。减少80% token使用。**
+
+### 8.1 三层披露策略
+
+| 层 | 内容 | 何时加载 |
+|---|------|---------|
+| **L1 摘要** | 一句话概述 | 每次都加载 |
+| **L2 结构** | 目录/索引 | 需要定位时 |
+| **L3 详情** | 完整内容 | 确认需要时 |
+
+### 8.2 实现方式
+
+```
+用户问："帮我看看这个项目的架构"
+    ↓
+L1: "这是一个5层架构的AI Engineering Skill体系"
+    ↓ 用户说"详细说说"
+L2: "包含Prompt/Context/Harness/Loop/Graph五层"
+    ↓ 用户说"Context层具体是什么"
+L3: 加载context-engineering的完整SKILL.md
+```
+
+### 8.3 在Hermes中的实践
+
+```python
+# L1: 用session_search获取摘要
+session_search(query="项目架构", limit=3)
+
+# L2: 用search_files获取结构
+search_files(pattern="*.md", target="files")
+
+# L3: 用read_file获取详情
+read_file(path="具体文件", offset=1, limit=100)
+```
+
+## 九、Context Compaction Hook（上下文压缩钩子）⭐ 第一轮学习新增
+
+> 来源：deepset-ai/haystack (26.1K⭐) — 最新Context Compaction Hook
+
+**核心理念：在迭代中自动压缩上下文，防止窗口溢出。**
+
+### 9.1 触发条件
+
+| 条件 | 动作 |
+|------|------|
+| context使用量 > 70% | 轻度压缩（摘要旧对话） |
+| context使用量 > 85% | 中度压缩（删除工具输出） |
+| context使用量 > 95% | 重度压缩（只保留关键信息） |
+
+### 9.2 压缩策略
+
+1. **对话历史** — 保留最近5轮，旧的摘要化
+2. **工具输出** — 只保留结论，删除原始输出
+3. **文件内容** — 只保留相关段落
+4. **记忆** — 保留，不压缩
+
+## 十、Adaptive Tool Ranking（自适应工具排名）⭐ 第一轮学习新增
+
+> 来源：ratel-ai/ratel — 进程内BM25检索 + 自适应工具排名
+
+**核心理念：根据任务类型自动排序工具优先级。**
+
+| 任务类型 | 优先工具 |
+|---------|---------|
+| 文件操作 | read_file > write_file > terminal |
+| 代码分析 | search_files > read_file > terminal |
+| 网络研究 | web_search > web_extract > browser |
+| 文档处理 | docx > pdf > ocr |
+
 ## 七、Pitfalls 常见陷阱
 
 1. **信息囤积症** — 不舍得丢弃上下文中的信息，导致窗口溢出、推理质量下降。**解法**：信任memory_save，信息存了就能找回来。

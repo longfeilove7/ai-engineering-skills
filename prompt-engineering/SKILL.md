@@ -91,6 +91,41 @@ description: Prompt Engineering引导Skill — 每次对话时检查用户prompt
 ### 紧急/简单任务
 一句话能完成的任务（如"几点了"、"star这个项目"），不提醒。
 
+## 第二章：结构化Prompt框架⭐ 第一轮学习新增
+
+> 来源：GitHub调研 — RSTI/TCREI/TFCDC框架
+
+### 2.1 RSTI框架（Role-Situation-Task-Intent）
+
+| 要素 | 说明 | 示例 |
+|------|------|------|
+| **R - Role** | 角色 | "你是一个资深售前工程师" |
+| **S - Situation** | 情境 | "客户是东北大学IT负责人" |
+| **T - Task** | 任务 | "准备拜访材料" |
+| **I - Intent** | 意图 | "了解需求，寻找合作机会" |
+
+### 2.2 TCREI框架（Task-Context-Role-Example-Instruction）
+
+适用于复杂任务，比RSTI更详细。
+
+### 2.3 TFCDC框架（Task-Format-Context-Details-Constraints）
+
+适用于需要严格格式的输出任务。
+
+### 2.4 与七要素的关系
+
+| 七要素 | RSTI | TCREI | TFCDC |
+|--------|------|-------|-------|
+| 🎯目标 | T | T | T |
+| 👤角色 | R | R | - |
+| 📋背景 | S | C | C |
+| 📏约束 | - | - | C |
+| 📐格式 | - | - | F |
+| 💡示例 | - | E | - |
+| 🎭风格 | I | I | D |
+
+**使用建议：** 简单任务用七要素，复杂任务用TCREI，格式严格用TFCDC。
+
 ## Present Results to User
 
 提醒时保持简洁，不要长篇大论。用表格或列表，一目了然。
