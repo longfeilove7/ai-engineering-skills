@@ -126,6 +126,120 @@ description: Prompt Engineering引导Skill — 每次对话时检查用户prompt
 
 **使用建议：** 简单任务用七要素，复杂任务用TCREI，格式严格用TFCDC。
 
+## 第四章：DSPy 可编程Prompt优化⭐ 第三轮研究新增
+
+> 来源：DSPy深度研究 — Signature/BootstrapFewShot/MIPRO/集成方案
+
+### 4.1 核心理念：从"写prompt"到"编译prompt"
+
+传统方式：人写prompt → 试错 → 手工调优
+DSPy方式：声明Signature → 定义metric → 编译器自动优化prompt
+
+**DSPy三件套**：
+| 组件 | 作用 | 对应我们的skill |
+|------|------|-----------------|
+| Signature | 声明式任务定义（输入→输出） | 七要素的结构化版本 |
+| Module | 执行策略（Predict/ChainOfThought/ReAct） | 框架选择（RSTI/TCREI） |
+| Optimizer | 自动优化prompt | 自动补全建议的进阶版 |
+
+### 4.2 Signature = 结化Prompt定义
+
+```python
+# 最简：内联签名
+qa = dspy.Predict("question -> answer")
+
+# 完整：类签名（推荐复杂任务）
+class Summarize(dspy.Signature):
+    """Summarize text into key points."""  # docstring = 🎯目标
+    text = dspy.InputField(desc="full article")  # 📋背景
+    summary = dspy.OutputField(desc="3-5 bullets")  # 📐格式
+```
+
+**与七要素的映射**：
+| 七要素 | Signature对应 | 说明 |
+|--------|-------------|------|
+| 🎯目标 | docstring | Signature的三引号字符串 |
+| 👤角色 | （由Module隐含） | ChainOfThought自带推理角色 |
+| 📋背景 | InputField | 输入字段 + desc |
+| 📏约束 | OutputField(desc=) | 在desc里写约束 |
+| 📐格式 | OutputField(desc=) | "bullet points, 3-5 items" |
+| 💡示例 | BootstrapFewShot自动注入 | 不用手写！ |
+| 🎭风格 | instruction prefix | MIPRO自动优化 |
+
+### 4.3 自动优化实践指南
+
+**BootstrapFewShot** — 最常用，10-50条数据即可：
+```python
+from dspy.teleprompt import BootstrapFewShot
+optimizer = BootstrapFewShot(metric=my_metric, max_bootstrapped_demos=3)
+optimized = optimizer.compile(module, trainset=trainset)
+```
+原理：从训练数据中筛选高质量预测，自动作为few-shot示例。
+
+**MIPROv2 / GEPA** — SOTA，50-200条数据，10-30分钟：
+```python
+# 推荐：GEPA（最新，用反思改进instruction）
+from dspy.teleprompt import GEPA
+optimizer = dspy.GEPA(metric=my_metric, reflection_lm=strong_lm, auto="light")
+optimized = optimizer.compile(module, trainset=trainset, valset=valset)
+# Metric返回 dspy.Prediction(score=X, feedback="原因") → 反馈驱动instruction改进
+
+# 备选：MIPROv2（贝叶斯优化）
+from dspy.teleprompt import MIPROv2
+optimizer = MIPROv2(metric=my_metric, num_candidates=10)
+optimized = optimizer.compile(module, trainset=trainset, valset=valset, num_trials=100)
+```
+原理：GEPA用反思+文本反馈自动改写instruction；MIPROv2用贝叶斯搜索。
+
+**Metric定义** — 优化的核心：
+```python
+def my_metric(example, pred, trace=None):
+    # 精确匹配
+    return example.answer.lower() == pred.answer.lower()
+    # 或F1 / 包含匹配 / 语义相似度
+```
+
+### 4.4 Skill增强建议
+
+对于我们的prompt-engineering skill，DSPy启发的改进方向：
+
+1. **Signature化**：把七要素框架变成可声明的结构，而不是自然语言提醒
+2. **Metric化**：定义prompt质量评分函数，自动量化而不是主观判断
+3. **Bootstrap化**：积累好的prompt-response对，自动作为few-shot示例
+4. **MIPRO化**：对关键skill的instruction做A/B测试，数据驱动选最优
+
+**当前可落地的一步**：把七要素检查从"提醒补充"升级为"结构化评分"：
+```python
+def prompt_quality_score(prompt: str) -> float:
+    """七要素自动评分，0-10分"""
+    score = 0
+    score += 2 if has_clear_task(prompt) else 0      # 🎯目标
+    score += 2 if has_context(prompt) else 0          # 📋背景
+    score += 2 if has_constraints(prompt) else 0      # 📏约束
+    score += 2 if has_format(prompt) else 0           # 📐格式
+    score += 1 if has_example(prompt) else 0          # 💡示例
+    score += 1 if has_role(prompt) else 0             # 👤角色
+    return score / 10.0
+```
+
+### 4.5 推荐优化流程
+
+```
+Baseline（手工prompt）
+  ↓ 定义Signature + metric
+BootstrapFewShot（自动few-shot，10+数据）
+  ↓ 数据量够时升级
+MIPRO（自动instruction，50+数据）
+  ↓ 持久化
+Save/Load（.json序列化，跨环境复用）
+```
+
+**Pitfalls**：
+- 数据量不足时不要用MIPRO，BootstrapFewShot就够
+- metric必须匹配任务，太严格会导致优化失败
+- max_bootstrapped_demos不要超过5，会过拟合
+- 保存优化结果，避免重复计算
+
 ## Present Results to User
 
 提醒时保持简洁，不要长篇大论。用表格或列表，一目了然。
@@ -177,6 +291,8 @@ description: Prompt Engineering引导Skill — 每次对话时检查用户prompt
 | 复杂任务 | TCREI / DSPy Signature | 要素齐全，可自动优化 |
 | 格式严格 | TFCDC / Outlines约束 | 保证输出格式100%合法 |
 | 程序化场景 | DSPy Signature | 声明式定义，自动优化prompt |
+| 数据驱动优化 | DSPy + BootstrapFewShot | 有10+好例→自动few-shot |
+| 指令自动优化 | DSPy + GEPA | 有50+数据→反思驱动instruction改进 |
 | 中文场景 | RSTI + 七要素 | 直觉友好，角色-情境-任务-意图 |
 
 ### 3.4 相关工具（供高级用户参考）

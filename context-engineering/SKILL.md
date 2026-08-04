@@ -738,6 +738,33 @@ Hermes已有memory_save/memory_recall，对应Mem0的User层：
 
 **核心理念：工作流执行状态持久化，崩溃后从断点恢复。** 在Hermes中用todo跟踪进度，每个completed项就是持久化检查点。
 
+## 二十、上下文压缩四技术⭐ 第十一轮学习新增
+
+> 来源：Gist Tokens + AutoCompressor + LLMLingua + Selective Context
+
+**核心结论：不是所有token都平等，区分"必须保留"和"可以丢弃"。**
+
+| 技术 | 原理 | 压缩率 | 适用场景 |
+|------|------|--------|---------|
+| **Gist Tokens** | 修改attention mask压缩指令到1个token | 26x | 指令压缩 |
+| **AutoCompressor** | 递归分段压缩，每段生成summary vector | 30K+ | 长文档 |
+| **LLMLingua** | 三层粗到细，差异化分配保留率 | 20x | prompt压缩 |
+| **Selective Context** | 小模型计算自信息，删除低信息量词汇 | 可变 | 记忆筛选 |
+
+### LLMLingua分层Budget Control
+
+| 内容类型 | 保留率 | 原因 |
+|---------|--------|------|
+| 指令 | 高(80%) | 不能丢 |
+| 问题 | 中(60%) | 核心意图 |
+| 示例 | 低(30%) | 可压缩 |
+
+### 在Hermes中的实践
+
+```
+长对话 → 信息密度评估 → 保留高密度信息 → 压缩低密度信息
+```
+
 1. **信息囤积症** — 不舍得丢弃上下文中的信息，导致窗口溢出、推理质量下降。**解法**：信任memory_save，信息存了就能找回来。
 
 2. **记忆碎片化** — 每条信息都存，但没有结构，检索时找不到。**解法**：用concepts标签分类存储，content要包含关键词。

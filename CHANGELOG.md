@@ -68,3 +68,9 @@
 - graph-engineering: 新增任务自动分解规则（≥5文件spawn）
 - graph-engineering: 新增Agent选择策略
 - 来源：OpenAI Agents SDK源码分析、LangGraph
+
+## v2.0.0 (2026-08-04) — 第十一轮深度学习
+- prompt-engineering: 新增DSPy可编程优化（GEPA取代MIPRO、Signature命名优化）
+- context-engineering: 新增上下文压缩四技术（Gist Tokens/AutoCompressor/LLMLingua/Selective Context）
+- loop-engineering: 新增OPRO优化技术（历史嵌入+自然语言目标+多样性注入）
+- loop-engineering: 新增双模型架构（优化器强模型+评分器工具）
