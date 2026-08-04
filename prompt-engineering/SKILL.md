@@ -648,3 +648,102 @@ response = client.messages.create(model="claude-sonnet-4-20250514", tools=tools,
 6. **忽略置信度**：低质量输出混入 → 设阈值触发人工审核
 7. **单点故障**：一个步骤失败全链终止 → 设计fallback和bypass
 8. **调试困难**：不知道哪步出错 → 保存每步完整输入输出到日志
+
+## 十、Prompt自动评估与回归测试⭐ 第十八轮研究新增
+
+> 来源：promptfoo (20k★, now OpenAI)、Langfuse (32k★)、DSPy、Braintrust
+> 完整研究报告：references/prompt-eval-regression-testing-research.md
+
+### 10.1 质量基准体系
+
+| 维度 | 指标 | 评估方式 | 基准目标 |
+|------|------|----------|----------|
+| 正确性 | 精确匹配率 | `equals`/`contains` | ≥95% |
+| 语义质量 | 语义相似度 | `similar` (embedding) | ≥0.8 |
+| 格式合规 | JSON/XML合法率 | `is-json` | 100% |
+| 指令遵循 | LLM-as-Judge评分 | `llm-rubric` | ≥4/5 |
+| 安全性 | 注入拒绝率 | Red Team自动测试 | 100% |
+| 一致性 | 跨运行稳定性 | 标准差 | σ<0.05 |
+
+**基准建立流程**：收集50-200个Golden Test Case → 定义多层评估（规则→语义→LLM→人工） → 运行3次取平均 → 设回归阈值
+
+### 10.2 A/B测试方案
+
+**离线A/B（开发阶段，promptfoo）**：
+```yaml
+prompts:
+  - file://prompts/v1_baseline.txt
+  - file://prompts/v2_cot.txt
+providers:
+  - openai:gpt-4o
+tests:
+  - file://test_cases.csv
+# 运行: promptfoo eval → 自动生成对比矩阵
+```
+
+**在线A/B（生产阶段，Langfuse）**：
+```python
+# 按用户ID分流，50/50，关联prompt版本自动统计
+prompt_a = langfuse.get_prompt("service", version=3)
+prompt_b = langfuse.get_prompt("service", version=4)
+# hash(user_id) % 100 < 50 → A, else → B
+```
+
+**统计决策**：配对t检验 p<0.05 + Cohen's d>0.2 → 上线候选版
+
+### 10.3 CI/CD回归自动化
+
+```yaml
+# .github/workflows/prompt-eval.yml
+on:
+  pull_request:
+    paths: ['prompts/**', 'promptfooconfig.yaml']
+jobs:
+  evaluate:
+    steps:
+      - run: npx promptfoo@latest eval -c promptfooconfig.yaml -o results.json
+      - run: |
+          PASS_RATE=$(jq '.results.stats.successes / (.results.stats.successes + .results.stats.failures) * 100' results.json)
+          if (( $(echo "$PASS_RATE < 95" | bc -l) )); then exit 1; fi
+```
+
+**分层策略**：
+
+| 层级 | 触发 | 范围 | 成本 |
+|------|------|------|------|
+| 快速 | 每次PR | 20个核心case | ~$0.1 |
+| 标准 | merge到main | 全部100个case | ~$0.5 |
+| 完整 | 每周/发版 | 200+ case + Red Team | ~$5 |
+| 安全 | 每天定时 | OWASP注入测试 | ~$2 |
+
+### 10.4 版本控制规范
+
+**语义化版本号**：`MAJOR.MINOR.PATCH`
+- MAJOR: prompt架构大改（角色重定义、范式变化）
+- MINOR: 新增能力（加few-shot、加CoT）
+- PATCH: 小修复（拼写、格式微调）
+
+**Git规范**：`prompt(<场景>): <变更描述>` + 包含回归测试结果
+
+**多环境标签**：`development → staging → canary(5%) → production(95%)`
+
+**Langfuse版本控制**：`create_prompt(labels=["production"])` + 运行时热切换 + 一键回滚
+
+### 10.5 工具选型
+
+| 团队规模 | 推荐方案 |
+|----------|----------|
+| 个人/小团队 | Git + promptfoo（免费、够用） |
+| 5-20人 | Git + promptfoo + Langfuse |
+| 20+人 | Langfuse + promptfoo + DSPy（全链路） |
+
+### 10.6 Pitfalls
+
+1. **不要只用精确匹配**：LLM输出有随机性，结合语义相似度和LLM评判
+2. **评估和生产必须同模型**：不同模型评估结果不可比
+3. **测试集不少于20个**：太小会遗漏边界case
+4. **不要忽略成本**：分层策略，规则断言→语义→LLM→人工
+5. **不要一次性全量换prompt**：灰度5%观察24小时
+6. **温度设置要一致**：评估时temperature=0保证可复现
+7. **必须有回滚方案**：每次变更前明确回滚版本号
+8. **不要只测好case**：必须包含对抗输入和历史上出错的case

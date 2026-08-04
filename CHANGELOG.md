@@ -105,3 +105,9 @@
 - context-engineering: 新增Proactive Context Preloading（预测性预加载+意图推断）
 - graph-engineering: 新增故障恢复模式（检查点重分配+任务关键性分级+文件乐观锁）
 - 来源：ICML 2026 Predictive Prefetching、Sculptor、AutoGen
+
+## v2.6.0 (2026-08-04) — 第十七轮深度学习
+- prompt-engineering: 新增自动评估与回归测试（promptfoo+Langfuse+CI/CD+灰度发布）
+- loop-engineering: 新增自适应策略调整（策略池贝叶斯选择+动态预算+5级复杂度预估+策略库自动构建）
+- harness-engineering: 新增工具链式优化（后处理管道+批量合并68%延迟降低+异步化+优先级队列）
+- 来源：promptfoo(已被OpenAI收购)、Langfuse、Voyager、ExpeL

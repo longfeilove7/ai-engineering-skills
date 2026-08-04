@@ -283,10 +283,81 @@ memory_recall(query="XX任务 策略 失败")
 | 步骤2完成 | 是否符合预期？ |
 | 最终结果 | 整体质量如何？ |
 
+## 自适应策略调整⭐ 第十二轮学习新增
+
+> 来源：Voyager (Wang 2023), ExpeL (Zhao 2023), ELPO (2602.09598), Graves 2016
+
+### 1. 失败→策略动态选择
+
+不是查静态表，而是从策略池中根据上下文选择：
+
+```yaml
+dynamic_strategy:
+  1_classify: "F1-F7分类"
+  2_analyze: "分析失败的具体表现"
+  3_candidates: "从策略池选3个候选"
+  4_score: "历史成功率+上下文匹配度"
+  5_select: "选最高分执行"
+  6_update: "执行后更新策略池统计"
+```
+
+### 2. 动态迭代上限
+
+```yaml
+dynamic_limit:
+  initial: 2        # 初始预算
+  absolute_max: 5   # 绝对上限
+  rules:
+    extend:   "score[t] > score[t-1] AND delta > 1.0 → limit += 1"
+    stop:     "连续2轮 delta < 0.5 → 收敛停止"
+    degrade:  "score[t] < score[t-1] → 立即回滚"
+    oscillate: "连续3轮在±1范围波动 → 输出最佳版本"
+```
+
+### 3. 复杂度→迭代预算
+
+| 复杂度 | 步骤数 | 预估轮数 | 策略 |
+|--------|--------|---------|------|
+| trivial | 1 | 1 | execute_only |
+| simple | 2-3 | 2 | execute_verify |
+| moderate | 4-6 | 3 | execute_verify_refine |
+| complex | 7-10 | 4 | plan_execute_prm_refine |
+| open_ended | 10+ | 5 | plan_execute_ab_refine |
+
+预估是先验不是枷锁——实际根据改善速率动态调整。
+
+### 4. 策略库自动构建
+
+```yaml
+strategy_library:
+  extract: "每次成功后分析关键步骤→LLM泛化→入库"
+  retrieve: "新任务→memory_recall(type=workflow)→匹配→选top-3"
+  track: "每次使用更新成功率，<30%淘汰，90天未用标记stale"
+  format:
+    task_type: "code_refactoring"
+    trigger: "检测到循环依赖"
+    steps: ["分析依赖图", "拓扑排序", "按序重构"]
+    success_rate: 0.85
+```
+
+**策略库是活的知识库：低效淘汰，高效优先，自动从成功经验中提取。**
+
+### 核心规则
+
+| 规则 | 说明 |
+|------|------|
+| R1 | 复杂度评估决定初始预算，实际由改善速率动态调整 |
+| R2 | 失败先分类，再从策略池选择，不是查静态表 |
+| R3 | 收敛/退化/振荡三种停止信号，不等到上限 |
+| R4 | 成功后自动提取策略入库，使用后更新成功率 |
+| R5 | 绝对上限5轮，从不静默失败 |
+
 ## Pitfalls
 
-1. **不要无限迭代** — 最多2次重试
+1. **不要无限迭代** — 绝对上限5轮
 2. **不要静默失败** — 每次失败都必须报告
 3. **不要跳过反思** — 每轮都要自我检查
 4. **不要降低标准** — 质量标准不能因迭代次数多而降低
 5. **不要重复同样的错误** — 每次迭代必须有改进
+6. **不要让预估成为枷锁** — 预估是起点不是终点
+7. **不要积累低效策略** — 定期清理策略库中成功率低的条目
