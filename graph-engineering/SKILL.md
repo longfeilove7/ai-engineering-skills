@@ -389,6 +389,52 @@ if conflicts:
 
 ## 反模式（避免）
 
+## 可扩展性⭐ 第十一轮深化
+
+> 完整报告：`references/multi-agent-scalability.md`
+
+### Agent池化管理
+
+```
+不是每次新建/销毁Agent，而是维持热池。
+
+Orchestrator
+  ├─ Advisor Pool (min:1, max:2)
+  ├─ Executor Pool (min:1, max:8)  ← 主力扩缩对象
+  └─ Verifier Pool (min:1, max:3)
+
+生命周期：INIT → READY → BUSY → DRAINING → STOPPED
+预热池：维持warm_size个已初始化Agent，扩容零延迟
+```
+
+### 弹性扩缩容（指标驱动）
+
+```python
+# 三核心指标
+queue_depth > 3        → 扩容executor
+load_ratio > 0.8       → 扩容对应池
+load_ratio < 0.2       → 缩容（安全：等任务完成）
+```
+
+### 多策略组合负载均衡
+
+| 策略 | 权重 | 说明 |
+------|------|------|
+| 最小连接 | 0.3 | 默认，负载低优先 |
+| 加权最小连接 | 0.2 | 考虑Agent处理速度 |
+| 文件亲和性 | 0.3 | 减少上下文切换 |
+| 能力匹配 | 0.2 | 任务-能力最优匹配 |
+
+### 性能优化核心
+
+| 优化 | 收益 | 复杂度 |
+------|------|--------|
+| 并行DAG执行 | 延迟↓50-70% | 中 |
+| LLM分级模型 | 成本↓40-60% | 低 |
+| 交接上下文压缩 | token↓60% | 低 |
+| 预热池 | 扩容0延迟 | 低 |
+| 响应缓存 | 重复任务0延迟 | 低 |
+
 1. **executor创新** — executor不应该做计划外的改动
 2. **verifier修复** — verifier只报告，不修复
 3. **静默失败** — 每次失败都必须报告
