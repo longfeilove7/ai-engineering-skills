@@ -99,3 +99,9 @@
 - harness-engineering: 新增三层结果缓存（L1结果/L2路径/L3分析）
 - ai-engineering: 新增跨层优化（4个标准数据结构+6条反馈回路+三层门控）
 - 来源：OWASP LLM Top 10、跨层优化研究
+
+## v2.5.0 (2026-08-04) — 第十六轮深度学习
+- prompt-engineering: 新增跨模型Prompt自适应（GPT-4/Claude/Gemini差异+适配器模式）
+- context-engineering: 新增Proactive Context Preloading（预测性预加载+意图推断）
+- graph-engineering: 新增故障恢复模式（检查点重分配+任务关键性分级+文件乐观锁）
+- 来源：ICML 2026 Predictive Prefetching、Sculptor、AutoGen

@@ -339,6 +339,54 @@ class LoadBalancer:
 | 并行 | asyncio.gather + 扇入verifier | 文件集不重叠 |
 | DAG | 拓扑排序 → 按层执行 → 层间传递结果 | 同层不重叠，跨层可重叠 |
 
+## 故障恢复⭐ 第十轮新增
+
+> 完整报告：`references/fault-recovery-patterns.md`
+
+### Agent崩溃时的任务重分配
+
+| 情况 | 策略 |
+|------|------|
+| executor超时/崩溃 | 从检查点恢复，分配给其他executor |
+| verifier崩溃 | 跳过验证，直接进review（标记WARNING） |
+| advisor崩溃 | 用最近的计划缓存恢复，或降级为executor直执行 |
+
+**检查点机制**：每个子步骤完成后保存checkpoint（已完成步骤 + 剩余步骤 + 已修改文件）。恢复时从断点继续，不从头开始。
+
+**重分配决策树**：
+```
+崩溃 → 有检查点？→ 是 → 从检查点恢复，换Agent
+                 → 否 → 从头开始，换Agent
+       已失败Agent数 < 2？→ 是 → 重分配
+                          → 否 → 升级到human
+```
+
+### 部分失败时的降级策略
+
+**任务关键性分级**：
+- CRITICAL：有下游依赖的任务（失败则重试换Agent）
+- IMPORTANT：验证/测试任务（失败可降级跳过）
+- OPTIONAL：文档/格式/注释（失败直接忽略）
+
+**降级层次**：L1重试 → L2跳过非关键 → L3简化方案 → L4回退 → L5人工接管
+
+### 分布式Agent状态同步
+
+**推荐方案：DAG状态机 + 文件锁**
+
+| 机制 | 用途 |
+|------|------|
+| 文件级乐观锁 | 防止并行executor写同一文件 |
+| DAG显式传递 | 完成节点显式输出给下游，无隐式共享 |
+| 事件日志 | 记录所有修改，verifier可审计 |
+
+```python
+# 执行前检查写冲突
+conflicts = check_file_locks(agent_id, task.writes)
+if conflicts:
+    return {"status": "blocked", "conflicts": conflicts}
+```
+
 ## 反模式（避免）
 
 1. **executor创新** — executor不应该做计划外的改动
