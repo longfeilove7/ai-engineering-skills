@@ -44,3 +44,10 @@
 - context-engineering: 新增时序记忆（Graphiti valid_from/valid_to）
 - context-engineering: 新增Durable Execution（Temporal崩溃恢复）
 - 来源：MemGPT、Mem0(YC S24)、Graphiti、Temporal
+
+## v1.7.0 (2026-08-04) — 第九轮聚焦学习改进
+- loop-engineering: 新增自我反思真相（纯自查无效，必须外部验证）
+- loop-engineering: 新增7类失败模式分类（F1-F7）+ 策略映射
+- loop-engineering: 新增收敛判据（Delta评分法）
+- loop-engineering: 新增质量追踪向量（多维度评分）
+- 来源：Huang et al. (2310.01798), CRITIC (2305.11738), Self-Consistency (2203.11171)
