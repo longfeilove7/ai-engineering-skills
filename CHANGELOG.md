@@ -86,3 +86,9 @@
 - context-engineering: 新增RAG评估优化（RAGAS框架+重排序+查询扩展+A/B测试）
 - graph-engineering: 新增多Agent通信协议（信封载荷分离+四层上下文传递+信任机制）
 - 来源：Liu et al. 2021、RAGAS、AutoGen v0.7、OpenAI Agents SDK
+
+## v2.3.0 (2026-08-04) — 第十四轮深度学习
+- prompt-engineering: 新增System Prompt设计（100-500 tokens最佳、行为描述>身份标签、Lost in the Middle对策）
+- context-engineering: 新增多模态上下文管理（Progressive Image Disclosure、4层代码分层、10级裁剪顺序）
+- loop-engineering: 新增A/B测试+版本管理（版本树、5种最佳版本选择、迭代历史可视化）
+- 来源：Anthropic/OpenAI最佳实践、ColPali、OPRO
